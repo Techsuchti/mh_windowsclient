@@ -5,9 +5,8 @@ using MeshhessenClient.Services;
 namespace MeshhessenClient.Protocols.MeshCore;
 
 /// <summary>
-/// First MeshCore Companion Protocol runtime for the Windows client.
-/// Handles session startup, device/self information and contact synchronisation.
-/// Transport-specific connection code remains in IConnectionService.
+/// MeshCore Companion Protocol runtime. Transport-specific connection code
+/// remains in IConnectionService.
 /// </summary>
 public sealed class MeshCoreCompanionService : IDisposable
 {
@@ -15,12 +14,11 @@ public sealed class MeshCoreCompanionService : IDisposable
     private readonly MeshCoreCompanionTransport _transport;
     private readonly MeshCoreCompanionFrameCodec _codec = new();
     private bool _started;
+    private readonly List<MeshCoreContact> _contacts = new();
 
     public MeshCoreDeviceInfo? DeviceInfo { get; private set; }
     public MeshCoreSelfInfo? SelfInfo { get; private set; }
     public IReadOnlyList<MeshCoreContact> Contacts => _contacts;
-
-    private readonly List<MeshCoreContact> _contacts = new();
 
     public event EventHandler<MeshCoreDeviceInfo>? DeviceInfoReceived;
     public event EventHandler<MeshCoreSelfInfo>? SelfInfoReceived;
@@ -41,13 +39,10 @@ public sealed class MeshCoreCompanionService : IDisposable
     {
         if (!_connection.IsConnected)
             throw new InvalidOperationException("The MeshCore connection is not established.");
-
         if (_started)
             return;
 
         _started = true;
-
-        // CMD_APP_START: command, app protocol version, six reserved bytes, app name.
         var appName = Encoding.UTF8.GetBytes("Meshhessen MeshCore Client");
         var payload = new byte[8 + appName.Length];
         payload[0] = MeshCoreProtocolConstants.CmdAppStart;
@@ -56,16 +51,11 @@ public sealed class MeshCoreCompanionService : IDisposable
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public async Task RequestContactsAsync(CancellationToken cancellationToken = default)
-    {
-        await SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdGetContacts }, cancellationToken);
-    }
+    public Task RequestContactsAsync(CancellationToken cancellationToken = default) =>
+        SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdGetContacts }, cancellationToken);
 
-    public async Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default)
-    {
-        var payload = new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 1 };
-        await SendPayloadAsync(payload, cancellationToken);
-    }
+    public Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default) =>
+        SendPayloadAsync(new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 1 }, cancellationToken);
 
     public async Task SendChannelMessageAsync(byte channelIndex, string text, DateTimeOffset? timestamp = null, CancellationToken cancellationToken = default)
     {
@@ -89,8 +79,6 @@ public sealed class MeshCoreCompanionService : IDisposable
         if (string.IsNullOrEmpty(text))
             throw new ArgumentException("Message text must not be empty.", nameof(text));
 
-        // CMD_SEND_TXT_MSG is intentionally kept behind this method so its exact
-        // wire layout can evolve independently from the UI/API surface.
         var textBytes = Encoding.UTF8.GetBytes(text);
         var payload = new byte[33 + textBytes.Length];
         payload[0] = MeshCoreProtocolConstants.CmdSendTextMessage;
@@ -102,8 +90,7 @@ public sealed class MeshCoreCompanionService : IDisposable
     private async Task SendPayloadAsync(byte[] payload, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var frame = _codec.EncodeCommand(payload, _transport);
-        await _connection.WriteAsync(frame);
+        await _connection.WriteAsync(_codec.EncodeCommand(payload, _transport));
     }
 
     private void OnConnectionStateChanged(object? sender, bool connected)
@@ -132,24 +119,17 @@ public sealed class MeshCoreCompanionService : IDisposable
 
         switch (payload[0])
         {
-            case MeshCoreProtocolConstants.RespSelfInfo:
-                ParseSelfInfo(payload);
-                break;
-            case MeshCoreProtocolConstants.RespDeviceInfo:
-                ParseDeviceInfo(payload);
-                break;
+            case MeshCoreProtocolConstants.RespSelfInfo: ParseSelfInfo(payload); break;
+            case MeshCoreProtocolConstants.RespDeviceInfo: ParseDeviceInfo(payload); break;
             case MeshCoreProtocolConstants.RespContactsStart:
                 _contacts.Clear();
+                ContactsSynchronized?.Invoke(this, _contacts.ToArray());
                 break;
-            case MeshCoreProtocolConstants.RespContact:
-                ParseContact(payload);
-                break;
+            case MeshCoreProtocolConstants.RespContact: ParseContact(payload); break;
             case MeshCoreProtocolConstants.RespContactMessage:
             case MeshCoreProtocolConstants.RespContactMessageV3:
             case MeshCoreProtocolConstants.RespChannelMessage:
-            case MeshCoreProtocolConstants.RespChannelMessageV3:
-                ParseMessage(payload);
-                break;
+            case MeshCoreProtocolConstants.RespChannelMessageV3: ParseMessage(payload); break;
             case MeshCoreProtocolConstants.PushMessageWaiting:
                 _ = RequestNextMessageAsync();
                 PushReceived?.Invoke(this, payload.ToArray());
@@ -171,19 +151,14 @@ public sealed class MeshCoreCompanionService : IDisposable
 
     private async Task RequestNextMessageAsync()
     {
-        try
-        {
-            await SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            ProtocolError?.Invoke(this, ex.Message);
-        }
+        try { await SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, CancellationToken.None); }
+        catch (Exception ex) { ProtocolError?.Invoke(this, ex.Message); }
     }
 
     private void ParseSelfInfo(ReadOnlySpan<byte> data)
     {
-        if (data.Length < 51)
+        // code + type + tx power + max tx power + key + lat/lon + reserved + telemetry + manual + freq + bw + sf + cr + name
+        if (data.Length < 58)
             throw new InvalidDataException("MeshCore SELF_INFO packet is too short.");
 
         var type = (MeshCoreContactType)data[1];
@@ -192,11 +167,11 @@ public sealed class MeshCoreCompanionService : IDisposable
         var publicKey = data.Slice(4, 32).ToArray();
         var lat = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(36, 4));
         var lon = BinaryPrimitives.ReadInt32LittleEndian(data.Slice(40, 4));
-        var freq = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(44, 4)) / 1000d;
-        var bandwidth = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d;
-        var sf = data.Length > 52 ? data[52] : (byte)0;
-        var cr = data.Length > 53 ? data[53] : (byte)0;
-        var name = data.Length > 54 ? ReadNullTerminatedUtf8(data.Slice(54)) : string.Empty;
+        var freq = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d;
+        var bandwidth = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4)) / 1000d;
+        var sf = data[56];
+        var cr = data[57];
+        var name = data.Length > 58 ? ReadNullTerminatedUtf8(data.Slice(58)) : string.Empty;
 
         SelfInfo = new MeshCoreSelfInfo(type, txPower, maxTxPower, publicKey, lat / 1_000_000d, lon / 1_000_000d, freq, bandwidth, sf, cr, name);
         SelfInfoReceived?.Invoke(this, SelfInfo);
@@ -221,7 +196,7 @@ public sealed class MeshCoreCompanionService : IDisposable
 
     private void ParseContact(ReadOnlySpan<byte> data)
     {
-        if (data.Length < 32 + 1 + 1 + 1 + 32 + 32 + 4 + 8)
+        if (data.Length < 144)
             throw new InvalidDataException("MeshCore CONTACT packet is too short.");
 
         var key = data.Slice(1, 32).ToArray();
@@ -241,10 +216,11 @@ public sealed class MeshCoreCompanionService : IDisposable
 
     private void ParseMessage(ReadOnlySpan<byte> data)
     {
-        // The exact message layout has version-specific fields. Keep the raw
-        // packet available through PushReceived and only expose stable fields here.
-        var text = data.Length > 1 ? ReadNullTerminatedUtf8(data.Slice(1)) : string.Empty;
-        MessageReceived?.Invoke(this, new MeshCoreMessage(null, null, text, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, data[0] is MeshCoreProtocolConstants.RespContactMessage or MeshCoreProtocolConstants.RespContactMessageV3));
+        // Message layouts differ between protocol revisions. Raw packets are
+        // always exposed through PushReceived; this event is intentionally conservative.
+        var isDm = data[0] is MeshCoreProtocolConstants.RespContactMessage or MeshCoreProtocolConstants.RespContactMessageV3;
+        MessageReceived?.Invoke(this, new MeshCoreMessage(null, null, string.Empty, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, isDm));
+        PushReceived?.Invoke(this, data.ToArray());
     }
 
     private static string ReadFixedAscii(ReadOnlySpan<byte> data)
