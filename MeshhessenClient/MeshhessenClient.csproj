@@ -19,38 +19,28 @@
     <FileVersion>2.0.0.0</FileVersion>
     <Company>MeshCore Community</Company>
     <Product>MeshCore Windows Client</Product>
-    <Description>Offline-fähiger Windows Client für MeshCore</Description>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <Description>Windows Desktop Client für MeshCore Companion Radios</Description>
   </PropertyGroup>
+
+  <!-- The old Meshtastic application remains in the repository for history, but is
+       deliberately excluded from compilation. This project is now MeshCore-only. -->
   <ItemGroup>
-    <PackageReference Include="Mapsui.Nts" Version="4.1.7" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
-    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
+    <Compile Remove="**\*.cs" />
+    <Compile Include="App.xaml.cs" />
+    <Compile Include="MeshCoreMainWindow.xaml.cs" />
+    <Compile Include="Services\IConnectionService.cs" />
+    <Compile Include="Services\SerialConnectionService.cs" />
+    <Compile Include="Services\Logger.cs" />
+    <Compile Include="Services\MeshCoreBluetoothConnectionService.cs" />
+    <Compile Include="Protocols\MeshCore\**\*.cs" />
+
+    <Page Remove="**\*.xaml" />
+    <ApplicationDefinition Remove="**\*.xaml" />
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="MeshCoreMainWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
-    <!-- Temporary compatibility dependencies; removed after MainWindow migration. -->
-    <PackageReference Include="Google.Protobuf" Version="3.25.2" />
-    <PackageReference Include="Grpc.Tools" Version="2.60.0" PrivateAssets="All" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="ModernWpfUI" Version="0.9.6" />
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
-    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
-    <PackageReference Include="Mapsui" Version="4.1.7" />
-    <PackageReference Include="Mapsui.Wpf" Version="4.1.7" />
-    <PackageReference Include="Emoji.Wpf" Version="0.3.3" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- Temporary Meshtastic compatibility layer. Remove after UI/service migration. -->
-    <Protobuf Include="..\protobufs\meshtastic\**\*.proto;..\protobufs\nanopb.proto" GrpcServices="None" ProtoRoot="..\protobufs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="logo_mh_wide.jpg" />
-    <None Remove="Resources\app.ico" />
-    <Resource Include="logo_mh_wide.jpg" />
-    <Resource Include="Resources\app.ico" />
-    <Resource Include="Resources\Strings.de.xaml" />
-    <Resource Include="Resources\Strings.en.xaml" />
-    <EmbeddedResource Include="..\CHANNELS.csv" />
-    <EmbeddedResource Include="Resources\VectorMap\**" />
   </ItemGroup>
 </Project>
