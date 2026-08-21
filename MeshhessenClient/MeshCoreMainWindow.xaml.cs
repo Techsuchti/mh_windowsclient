@@ -14,6 +14,7 @@ public partial class MeshCoreMainWindow : Window
     private readonly ObservableCollection<string> _messages = new();
     private SerialConnectionService? _connection;
     private MeshCoreApplicationController? _client;
+    private MeshCoreStartupCoordinator? _startup;
     private byte _activeChannel;
 
     public MeshCoreMainWindow()
@@ -40,13 +41,7 @@ public partial class MeshCoreMainWindow : Window
         {
             if (_connection?.IsConnected == true)
             {
-                _connection.Disconnect();
-                _client?.Dispose();
-                _client = null;
-                _connection.Dispose();
-                _connection = null;
-                ConnectButton.Content = "Connect";
-                StatusText.Text = "Disconnected";
+                DisconnectClient();
                 return;
             }
 
@@ -56,7 +51,12 @@ public partial class MeshCoreMainWindow : Window
                 return;
             }
 
-            var baud = int.Parse(((ComboBoxItem)BaudComboBox.SelectedItem).Tag.ToString()!);
+            if (BaudComboBox.SelectedItem is not ComboBoxItem baudItem || !int.TryParse(baudItem.Tag?.ToString(), out var baud))
+            {
+                StatusText.Text = "Select a valid baud rate.";
+                return;
+            }
+
             _connection = new SerialConnectionService();
             _connection.ConnectionStateChanged += ConnectionStateChanged;
             _client = new MeshCoreApplicationController(_connection, MeshCoreCompanionTransport.Stream);
@@ -67,19 +67,33 @@ public partial class MeshCoreMainWindow : Window
             _client.MessageReceived += ClientMessageReceived;
             _client.Error += ClientError;
 
+            _startup = new MeshCoreStartupCoordinator(_client);
             StatusText.Text = $"Connecting to MeshCore on {port}...";
             await _connection.ConnectAsync(new SerialConnectionParameters { PortName = port, BaudRate = baud });
-            await _client.StartAsync();
+            await _startup.InitializeAsync();
             ConnectButton.Content = "Disconnect";
+            StatusText.Text = $"MeshCore ready – {_contacts.Count} contacts, {_channels.Count} channels";
         }
         catch (Exception ex)
         {
             StatusText.Text = $"Connection error: {ex.Message}";
-            _client?.Dispose();
-            _connection?.Dispose();
-            _client = null;
-            _connection = null;
+            DisconnectClient();
         }
+    }
+
+    private void DisconnectClient()
+    {
+        _startup = null;
+        _client?.Dispose();
+        _client = null;
+        _connection?.Disconnect();
+        _connection?.Dispose();
+        _connection = null;
+        _contacts.Clear();
+        _channels.Clear();
+        ConnectButton.Content = "Connect";
+        StatusText.Text = "Disconnected";
+        DeviceText.Text = "No MeshCore device";
     }
 
     private void ConnectionStateChanged(object? sender, bool connected)
@@ -97,7 +111,6 @@ public partial class MeshCoreMainWindow : Window
         {
             _contacts.Clear();
             foreach (var contact in contacts) _contacts.Add(contact);
-            StatusText.Text = $"MeshCore ready – {_contacts.Count} contacts";
         });
     }
 
@@ -156,8 +169,7 @@ public partial class MeshCoreMainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
-        _client?.Dispose();
-        _connection?.Dispose();
+        DisconnectClient();
         base.OnClosed(e);
     }
 }
