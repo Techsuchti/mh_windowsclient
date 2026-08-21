@@ -4,10 +4,6 @@ using MeshhessenClient.Services;
 
 namespace MeshhessenClient.Protocols.MeshCore;
 
-/// <summary>
-/// Runtime for the MeshCore Companion Protocol. It intentionally contains no
-/// Meshtastic/protobuf logic and can operate over BLE or a framed stream.
-/// </summary>
 public sealed class MeshCoreCompanionService : IDisposable
 {
     private readonly IConnectionService _connection;
@@ -19,7 +15,6 @@ public sealed class MeshCoreCompanionService : IDisposable
     public MeshCoreDeviceInfo? DeviceInfo { get; private set; }
     public MeshCoreSelfInfo? SelfInfo { get; private set; }
     public IReadOnlyList<MeshCoreContact> Contacts => _contacts;
-
     public event EventHandler<MeshCoreDeviceInfo>? DeviceInfoReceived;
     public event EventHandler<MeshCoreSelfInfo>? SelfInfoReceived;
     public event EventHandler<IReadOnlyList<MeshCoreContact>>? ContactsSynchronized;
@@ -38,47 +33,38 @@ public sealed class MeshCoreCompanionService : IDisposable
 
     public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        if (!_connection.IsConnected)
-            throw new InvalidOperationException("The MeshCore connection is not established.");
+        if (!_connection.IsConnected) throw new InvalidOperationException("The MeshCore connection is not established.");
         if (_started) return;
         _started = true;
-
-        // APP_START must be the first request. The firmware answers with SELF_INFO.
         var appName = Encoding.UTF8.GetBytes("MeshCore Windows Client");
         var payload = new byte[8 + appName.Length];
         payload[0] = MeshCoreProtocolConstants.CmdAppStart;
-        payload[1] = 1;
         appName.CopyTo(payload, 8);
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default) =>
-        SendPayloadAsync(new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 3 }, cancellationToken);
+    public Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default) => SendPayloadAsync(new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 3 }, cancellationToken);
 
     public Task RequestContactsAsync(uint? since = null, CancellationToken cancellationToken = default)
     {
         var payload = since.HasValue ? new byte[5] : new byte[1];
         payload[0] = MeshCoreProtocolConstants.CmdGetContacts;
-        if (since.HasValue)
-            BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(1, 4), since.Value);
+        if (since.HasValue) BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(1, 4), since.Value);
         return SendPayloadAsync(payload, cancellationToken);
     }
 
-    public Task RequestChannelAsync(byte channelIndex, CancellationToken cancellationToken = default) =>
-        SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdGetChannel, channelIndex }, cancellationToken);
+    public Task RequestChannelAsync(byte channelIndex, CancellationToken cancellationToken = default) => SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdGetChannel, channelIndex }, cancellationToken);
 
     public async Task SendChannelMessageAsync(byte channelIndex, string text, DateTimeOffset? timestamp = null, CancellationToken cancellationToken = default)
     {
         ValidateText(text);
         var bytes = Encoding.UTF8.GetBytes(text);
         if (bytes.Length > 133) throw new ArgumentException("MeshCore channel messages are limited to 133 UTF-8 bytes.", nameof(text));
-
-        // CMD_SEND_CHANNEL_TXT_MSG: command, channel index, timestamp, text.
         var payload = new byte[7 + bytes.Length];
         payload[0] = MeshCoreProtocolConstants.CmdSendChannelTextMessage;
-        payload[1] = channelIndex;
-        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(2, 4), checked((uint)(timestamp ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds()));
-        payload[6] = 0; // text type: plain
+        payload[1] = 0;
+        payload[2] = channelIndex;
+        BinaryPrimitives.WriteUInt32LittleEndian(payload.AsSpan(3, 4), checked((uint)(timestamp ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds()));
         bytes.CopyTo(payload, 7);
         await SendPayloadAsync(payload, cancellationToken);
     }
@@ -89,8 +75,6 @@ public sealed class MeshCoreCompanionService : IDisposable
         ValidateText(text);
         var bytes = Encoding.UTF8.GetBytes(text);
         if (bytes.Length > 133) throw new ArgumentException("MeshCore direct messages are limited to 133 UTF-8 bytes.", nameof(text));
-
-        // Current Companion command: code + 32-byte destination key + text type + text.
         var payload = new byte[34 + bytes.Length];
         payload[0] = MeshCoreProtocolConstants.CmdSendTextMessage;
         destinationPublicKey.CopyTo(payload.AsSpan(1, 32));
@@ -99,8 +83,7 @@ public sealed class MeshCoreCompanionService : IDisposable
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public async Task SyncNextMessageAsync(CancellationToken cancellationToken = default) =>
-        await SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, cancellationToken);
+    public Task SyncNextMessageAsync(CancellationToken cancellationToken = default) => SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, cancellationToken);
 
     private async Task SendPayloadAsync(byte[] payload, CancellationToken cancellationToken)
     {
@@ -109,21 +92,12 @@ public sealed class MeshCoreCompanionService : IDisposable
         await _connection.WriteAsync(_codec.EncodeCommand(payload, _transport));
     }
 
-    private void OnConnectionStateChanged(object? sender, bool connected)
-    {
-        if (!connected) _started = false;
-    }
+    private void OnConnectionStateChanged(object? sender, bool connected) { if (!connected) _started = false; }
 
     private void OnDataReceived(object? sender, byte[] data)
     {
-        try
-        {
-            foreach (var payload in _codec.Feed(data, _transport)) ParsePayload(payload);
-        }
-        catch (Exception ex)
-        {
-            ProtocolError?.Invoke(this, ex.Message);
-        }
+        try { foreach (var payload in _codec.Feed(data, _transport)) ParsePayload(payload); }
+        catch (Exception ex) { ProtocolError?.Invoke(this, ex.Message); }
     }
 
     private void ParsePayload(ReadOnlySpan<byte> data)
@@ -141,43 +115,18 @@ public sealed class MeshCoreCompanionService : IDisposable
             case MeshCoreProtocolConstants.RespContactMessageV3:
             case MeshCoreProtocolConstants.RespChannelMessage:
             case MeshCoreProtocolConstants.RespChannelMessageV3: ParseMessage(data); break;
-            case MeshCoreProtocolConstants.PushMessageWaiting:
-                PushReceived?.Invoke(this, data.ToArray());
-                _ = SyncNextMessageAsync();
-                break;
-            case MeshCoreProtocolConstants.PushAdvert:
-            case MeshCoreProtocolConstants.PushPathUpdated:
-            case MeshCoreProtocolConstants.PushSendConfirmed:
-            case MeshCoreProtocolConstants.PushRawData:
-            case MeshCoreProtocolConstants.PushLoginSuccess:
-            case MeshCoreProtocolConstants.PushLoginFail:
-            case MeshCoreProtocolConstants.PushStatusResponse:
-            case MeshCoreProtocolConstants.PushTraceData:
-            case MeshCoreProtocolConstants.PushNewAdvert:
-            case MeshCoreProtocolConstants.PushTelemetryResponse:
-            case MeshCoreProtocolConstants.PushBinaryResponse:
-            case MeshCoreProtocolConstants.PushControlData:
-                PushReceived?.Invoke(this, data.ToArray());
-                break;
-            case MeshCoreProtocolConstants.RespError:
-                ProtocolError?.Invoke(this, data.Length > 1 ? $"MeshCore error code {data[1]}" : "MeshCore returned an error.");
-                break;
+            case MeshCoreProtocolConstants.PushMessageWaiting: PushReceived?.Invoke(this, data.ToArray()); _ = SyncNextMessageAsync(); break;
+            case MeshCoreProtocolConstants.RespError: ProtocolError?.Invoke(this, data.Length > 1 ? $"MeshCore error code {data[1]}" : "MeshCore returned an error."); break;
+            default: PushReceived?.Invoke(this, data.ToArray()); break;
         }
     }
 
     private void ParseSelfInfo(ReadOnlySpan<byte> data)
     {
         if (data.Length < 58) throw new InvalidDataException("SELF_INFO packet is too short.");
-        var info = new MeshCoreSelfInfo(
-            (MeshCoreContactType)data[1], data[2], data[3], data.Slice(4, 32).ToArray(),
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(36, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(40, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d,
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4)) / 1000d,
-            data[56], data[57], ReadUtf8(data.Slice(58)));
+        var info = new MeshCoreSelfInfo((MeshCoreContactType)data[1], data[2], data[3], data.Slice(4, 32).ToArray(), BinaryPrimitives.ReadInt32LittleEndian(data.Slice(36, 4)) / 1_000_000d, BinaryPrimitives.ReadInt32LittleEndian(data.Slice(40, 4)) / 1_000_000d, BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d, BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4)) / 1000d, data[56], data[57], ReadUtf8(data.Slice(58)));
         SelfInfo = info;
         SelfInfoReceived?.Invoke(this, info);
-        // Device query is the second startup request after APP_START/SELF_INFO.
         _ = RequestDeviceInfoAsync();
     }
 
@@ -197,15 +146,8 @@ public sealed class MeshCoreCompanionService : IDisposable
 
     private void ParseContact(ReadOnlySpan<byte> data)
     {
-        // code + key32 + type + flags + signed pathLen + path64 + name32 + lastAdvert + lat + lon + lastMod
         if (data.Length < 148) throw new InvalidDataException("CONTACT packet is too short.");
-        var contact = new MeshCoreContact(
-            data.Slice(1, 32).ToArray(), (MeshCoreContactType)data[33], data[34], unchecked((sbyte)data[35]),
-            data.Slice(36, 64).ToArray(), ReadFixedUtf8(data.Slice(100, 32)),
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(132, 4)),
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(136, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(140, 4)) / 1_000_000d);
-        _contacts.Add(contact);
+        _contacts.Add(new MeshCoreContact(data.Slice(1, 32).ToArray(), (MeshCoreContactType)data[33], data[34], unchecked((sbyte)data[35]), data.Slice(36, 64).ToArray(), ReadFixedUtf8(data.Slice(100, 32)), BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(132, 4)), BinaryPrimitives.ReadInt32LittleEndian(data.Slice(136, 4)) / 1_000_000d, BinaryPrimitives.ReadInt32LittleEndian(data.Slice(140, 4)) / 1_000_000d));
     }
 
     private void ParseChannel(ReadOnlySpan<byte> data)
@@ -218,46 +160,26 @@ public sealed class MeshCoreCompanionService : IDisposable
     {
         var v3 = data[0] is MeshCoreProtocolConstants.RespContactMessageV3 or MeshCoreProtocolConstants.RespChannelMessageV3;
         var offset = v3 ? 4 : 1;
-        if (data.Length < offset + (data[0] is MeshCoreProtocolConstants.RespContactMessage or MeshCoreProtocolConstants.RespContactMessageV3 ? 12 : 7))
-            throw new InvalidDataException("MESSAGE packet is too short.");
-
-        int? snr = null;
-        if (v3) snr = unchecked((sbyte)data[1]) / 4;
-        byte[]? senderKey = null;
+        int? snr = v3 ? unchecked((sbyte)data[1]) / 4 : null;
         byte? channel = null;
-        if (data[0] is MeshCoreProtocolConstants.RespContactMessage or MeshCoreProtocolConstants.RespContactMessageV3)
+        if (data[0] is MeshCoreProtocolConstants.RespChannelMessage or MeshCoreProtocolConstants.RespChannelMessageV3)
         {
-            senderKey = data.Slice(offset, 6).ToArray();
-            offset += 6;
+            if (data.Length < offset + 7) throw new InvalidDataException("CHANNEL_MSG packet is too short.");
+            channel = data[offset++];
         }
         else
         {
-            channel = data[offset];
-            offset += 1;
+            if (data.Length < offset + 10) throw new InvalidDataException("CONTACT_MSG packet is too short.");
+            offset += 3;
         }
-        offset += 2; // path length + text type
+        offset += 2;
         var timestamp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
         offset += 4;
-        MessageReceived?.Invoke(this, new MeshCoreMessage(senderKey, channel, ReadUtf8(data.Slice(offset)), timestamp, snr, senderKey != null));
+        MessageReceived?.Invoke(this, new MeshCoreMessage(null, channel, ReadUtf8(data.Slice(offset)), timestamp, snr, channel is null));
     }
 
-    private static void ValidateText(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException("Message text must not be empty.", nameof(text));
-    }
-
+    private static void ValidateText(string text) { if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException("Message text must not be empty.", nameof(text)); }
     private static string ReadFixedUtf8(ReadOnlySpan<byte> data) => ReadUtf8(data).Trim();
-
-    private static string ReadUtf8(ReadOnlySpan<byte> data)
-    {
-        var end = data.IndexOf((byte)0);
-        if (end < 0) end = data.Length;
-        return Encoding.UTF8.GetString(data[..end]);
-    }
-
-    public void Dispose()
-    {
-        _connection.DataReceived -= OnDataReceived;
-        _connection.ConnectionStateChanged -= OnConnectionStateChanged;
-    }
+    private static string ReadUtf8(ReadOnlySpan<byte> data) { var end = data.IndexOf((byte)0); if (end < 0) end = data.Length; return Encoding.UTF8.GetString(data[..end]); }
+    public void Dispose() { _connection.DataReceived -= OnDataReceived; _connection.ConnectionStateChanged -= OnConnectionStateChanged; }
 }
