@@ -1,9 +1,6 @@
 namespace MeshhessenClient.Protocols.MeshCore;
 
-/// <summary>
-/// MeshCore Companion Protocol command, response and push codes.
-/// Values follow the current official Companion Protocol specification.
-/// </summary>
+/// <summary>Current MeshCore Companion Protocol command, response and push codes.</summary>
 public static class MeshCoreProtocolConstants
 {
     public const byte CmdAppStart = 0x01;
@@ -22,9 +19,22 @@ public static class MeshCoreProtocolConstants
     public const byte CmdSetAdvertLatLon = 0x0E;
     public const byte CmdRemoveContact = 0x0F;
     public const byte CmdShareContact = 0x10;
-    public const byte CmdGetChannel = 0x13;
-    public const byte CmdSetChannel = 0x14;
+    public const byte CmdExportContact = 0x11;
+    public const byte CmdImportContact = 0x12;
+    public const byte CmdReboot = 0x13;
+    public const byte CmdGetBatteryAndStorage = 0x14;
+    public const byte CmdSetTuningParams = 0x15;
     public const byte CmdDeviceQuery = 0x16;
+    public const byte CmdExportPrivateKey = 0x17;
+    public const byte CmdImportPrivateKey = 0x18;
+    public const byte CmdSendRawData = 0x19;
+    public const byte CmdSendLogin = 0x1A;
+    public const byte CmdSendStatusRequest = 0x1B;
+    public const byte CmdGetChannel = 0x1E;
+    public const byte CmdSetChannel = 0x20;
+    public const byte CmdSendTracePath = 0x24;
+    public const byte CmdSendTelemetryRequest = 0x27;
+    public const byte CmdGetStats = 0x38;
 
     public const byte RespOk = 0x00;
     public const byte RespError = 0x01;
