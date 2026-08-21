@@ -41,15 +41,17 @@ public sealed record MeshCoreContact(
     double? Latitude,
     double? Longitude);
 
-public sealed record MeshCoreChannel(
-    byte Index,
-    string Name,
-    byte[] Secret);
-
+/// <summary>
+/// A contact-message sender is represented by the 6-byte public-key prefix
+/// supplied by the Companion protocol. The full public key is not present in
+/// the queued message response.
+/// </summary>
 public sealed record MeshCoreMessage(
-    byte[]? SenderPublicKey,
+    byte[]? SenderPublicKeyPrefix,
     byte? ChannelIndex,
     string Text,
     uint Timestamp,
-    int? SnrDb,
-    bool IsDirectMessage);
+    double? SnrDb,
+    bool IsDirectMessage,
+    byte TextType = 0,
+    byte PathLength = 0);
