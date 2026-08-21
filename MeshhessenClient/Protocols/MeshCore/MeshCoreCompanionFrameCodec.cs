@@ -33,10 +33,6 @@ public sealed class MeshCoreCompanionFrameCodec
         return frame;
     }
 
-    /// <summary>
-    /// Adds incoming data and returns complete radio-to-app payloads.
-    /// For BLE each input is already one complete payload.
-    /// </summary>
     public IReadOnlyList<byte[]> Feed(ReadOnlySpan<byte> data, MeshCoreCompanionTransport transport)
     {
         if (transport == MeshCoreCompanionTransport.Ble)
@@ -50,14 +46,13 @@ public sealed class MeshCoreCompanionFrameCodec
             if (_buffer.Count < 3)
                 break;
 
-            var marker = _buffer[0];
-            if (marker != MeshCoreProtocolConstants.SerialRadioToApp)
+            if (_buffer[0] != MeshCoreProtocolConstants.SerialRadioToApp)
             {
                 _buffer.RemoveAt(0);
                 continue;
             }
 
-            var length = BinaryPrimitives.ReadUInt16LittleEndian(CollectionsMarshal.AsSpan(_buffer).Slice(1, 2));
+            var length = (ushort)(_buffer[1] | (_buffer[2] << 8));
             if (_buffer.Count < length + 3)
                 break;
 
