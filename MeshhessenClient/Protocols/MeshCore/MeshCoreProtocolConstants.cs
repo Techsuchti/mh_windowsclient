@@ -1,6 +1,6 @@
 namespace MeshhessenClient.Protocols.MeshCore;
 
-/// <summary>Current MeshCore Companion Protocol command, response and push codes.</summary>
+/// <summary>MeshCore Companion Protocol command, response and push codes.</summary>
 public static class MeshCoreProtocolConstants
 {
     public const byte CmdAppStart = 0x01;
@@ -30,7 +30,7 @@ public static class MeshCoreProtocolConstants
     public const byte CmdSendRawData = 0x19;
     public const byte CmdSendLogin = 0x1A;
     public const byte CmdSendStatusRequest = 0x1B;
-    public const byte CmdGetChannel = 0x1E;
+    public const byte CmdGetChannel = 0x1F;
     public const byte CmdSetChannel = 0x20;
     public const byte CmdSendTracePath = 0x24;
     public const byte CmdSendTelemetryRequest = 0x27;
