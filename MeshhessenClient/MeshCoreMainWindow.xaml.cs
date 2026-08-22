@@ -15,6 +15,8 @@ public partial class MeshCoreMainWindow : Window
     private readonly ObservableCollection<MeshCoreContact> _contacts = new();
     private readonly ObservableCollection<MeshCoreChannel> _channels = new();
     private readonly ObservableCollection<string> _messages = new();
+    private readonly ObservableCollection<MeshCoreNodeListItem> _nodes = new();
+    private readonly ObservableCollection<MeshCoreMapListItem> _mapNodes = new();
     private readonly MeshCoreMessageStore _messageStore = new();
     private IConnectionService? _connection;
     private MeshCoreApplicationController? _client;
@@ -27,6 +29,8 @@ public partial class MeshCoreMainWindow : Window
         ContactsListBox.ItemsSource = _contacts;
         ChannelsListBox.ItemsSource = _channels;
         MessagesListBox.ItemsSource = _messages;
+        NodesListBox.ItemsSource = _nodes;
+        MapNodesListBox.ItemsSource = _mapNodes;
         RefreshSerialPorts();
         UpdateTransportUi();
     }
@@ -88,9 +92,7 @@ public partial class MeshCoreMainWindow : Window
             PortComboBox.ItemsSource = candidates;
             PortComboBox.DisplayMemberPath = "Name";
             if (candidates.Length > 0) PortComboBox.SelectedIndex = 0;
-            StatusText.Text = candidates.Length == 0
-                ? "No MeshCore BLE device found. Pair the Companion in Windows first."
-                : $"Found {candidates.Length} MeshCore BLE device(s).";
+            StatusText.Text = candidates.Length == 0 ? "No MeshCore BLE device found. Pair the Companion in Windows first." : $"Found {candidates.Length} MeshCore BLE device(s).";
         }
         catch (Exception ex) { StatusText.Text = $"BLE scan failed: {ex.Message}"; }
     }
@@ -108,12 +110,11 @@ public partial class MeshCoreMainWindow : Window
                 _ => new SerialConnectionService()
             };
             _connection.ConnectionStateChanged += ConnectionStateChanged;
-            _client = new MeshCoreApplicationController(
-                _connection,
-                transport == ConnectionType.Bluetooth ? MeshCoreCompanionTransport.Ble : MeshCoreCompanionTransport.Stream);
+            _client = new MeshCoreApplicationController(_connection, transport == ConnectionType.Bluetooth ? MeshCoreCompanionTransport.Ble : MeshCoreCompanionTransport.Stream);
             _client.SelfChanged += ClientSelfChanged;
             _client.DeviceChanged += ClientDeviceChanged;
             _client.ContactsChanged += ClientContactsChanged;
+            _client.NodesChanged += ClientNodesChanged;
             _client.ChannelReceived += ClientChannelReceived;
             _client.MessageReceived += ClientMessageReceived;
             _client.Error += ClientError;
@@ -147,8 +148,7 @@ public partial class MeshCoreMainWindow : Window
 
     private static async Task<ulong> GetBluetoothAddressAsync(string deviceId)
     {
-        using var device = await BluetoothLEDevice.FromIdAsync(deviceId)
-            ?? throw new InvalidOperationException("Could not open the selected BLE device.");
+        using var device = await BluetoothLEDevice.FromIdAsync(deviceId) ?? throw new InvalidOperationException("Could not open the selected BLE device.");
         return device.BluetoothAddress;
     }
 
@@ -162,21 +162,19 @@ public partial class MeshCoreMainWindow : Window
         _connection = null;
         _contacts.Clear();
         _channels.Clear();
+        _nodes.Clear();
+        _mapNodes.Clear();
         _messages.Clear();
+        NodeCountText.Text = "0 nodes";
         ConnectButton.Content = "Connect";
         StatusText.Text = "Disconnected";
         DeviceText.Text = "No MeshCore device";
         DirectMessageCheckBox.IsChecked = false;
     }
 
-    private void ConnectionStateChanged(object? sender, bool connected)
-        => Dispatcher.Invoke(() => StatusText.Text = connected ? "Connected – starting MeshCore Companion" : "Disconnected");
-
-    private void ClientSelfChanged(object? sender, MeshCoreSelfInfo info)
-        => Dispatcher.Invoke(() => StatusText.Text = $"MeshCore ready – {info.Name} ({info.Type})");
-
-    private void ClientDeviceChanged(object? sender, MeshCoreDeviceInfo info)
-        => Dispatcher.Invoke(() => DeviceText.Text = $"{info.Model}  |  FW {info.SemanticVersion}  |  {info.MaxContacts} contacts / {info.MaxChannels} channels");
+    private void ConnectionStateChanged(object? sender, bool connected) => Dispatcher.Invoke(() => StatusText.Text = connected ? "Connected – starting MeshCore Companion" : "Disconnected");
+    private void ClientSelfChanged(object? sender, MeshCoreSelfInfo info) => Dispatcher.Invoke(() => StatusText.Text = $"MeshCore ready – {info.Name} ({info.Type})");
+    private void ClientDeviceChanged(object? sender, MeshCoreDeviceInfo info) => Dispatcher.Invoke(() => DeviceText.Text = $"{info.Model} | FW {info.SemanticVersion} | {info.MaxContacts} contacts / {info.MaxChannels} channels");
 
     private void ClientContactsChanged(object? sender, IReadOnlyList<MeshCoreContact> contacts)
     {
@@ -187,6 +185,20 @@ public partial class MeshCoreMainWindow : Window
         });
     }
 
+    private void ClientNodesChanged(object? sender, EventArgs e)
+    {
+        if (_client == null) return;
+        var nodes = _client.NodeRegistry.Snapshot();
+        Dispatcher.Invoke(() =>
+        {
+            _nodes.Clear();
+            foreach (var node in nodes) _nodes.Add(new MeshCoreNodeListItem(node));
+            _mapNodes.Clear();
+            foreach (var mapNode in MeshCoreMapProjection.WithPosition(nodes)) _mapNodes.Add(new MeshCoreMapListItem(mapNode));
+            NodeCountText.Text = $"{nodes.Count} nodes | {_mapNodes.Count} with GPS";
+        });
+    }
+
     private void ClientChannelReceived(object? sender, MeshCoreChannel channel)
     {
         Dispatcher.Invoke(() =>
@@ -194,8 +206,7 @@ public partial class MeshCoreMainWindow : Window
             var existing = _channels.FirstOrDefault(x => x.Index == channel.Index);
             if (existing != null) _channels.Remove(existing);
             _channels.Add(channel);
-            if (ChannelsListBox.SelectedItem is null && channel.Index == 0)
-                ChannelsListBox.SelectedItem = channel;
+            if (ChannelsListBox.SelectedItem is null && channel.Index == 0) ChannelsListBox.SelectedItem = channel;
         });
     }
 
@@ -209,72 +220,87 @@ public partial class MeshCoreMainWindow : Window
         });
     }
 
-    private void ClientError(object? sender, string error)
-        => Dispatcher.Invoke(() => StatusText.Text = $"MeshCore error: {error}");
+    private void ClientError(object? sender, string error) => Dispatcher.Invoke(() => StatusText.Text = $"MeshCore error: {error}");
+    private void ChannelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ChannelsListBox.SelectedItem is MeshCoreChannel channel) _activeChannel = channel.Index; }
+    private void ContactsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (ContactsListBox.SelectedItem is MeshCoreContact contact) StatusText.Text = $"Selected {contact.Name} ({contact.Type})"; }
 
-    private void ChannelsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void NodesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ChannelsListBox.SelectedItem is MeshCoreChannel channel)
-            _activeChannel = channel.Index;
+        if (NodesListBox.SelectedItem is MeshCoreNodeListItem node)
+        {
+            StatusText.Text = $"Selected {node.DisplayName} ({node.Type}) — {node.PositionText}";
+            SelectContactByPublicKey(node.PublicKey);
+        }
     }
 
-    private void ContactsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void MapNodesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (ContactsListBox.SelectedItem is MeshCoreContact contact)
-            StatusText.Text = $"Selected {contact.Name} ({contact.Type})";
+        if (MapNodesListBox.SelectedItem is MeshCoreMapListItem node)
+        {
+            StatusText.Text = $"Selected {node.DisplayText}";
+            SelectContactById(node.Id);
+        }
+    }
+
+    private void SelectContactByPublicKey(byte[] publicKey)
+    {
+        var contact = _contacts.FirstOrDefault(c => c.PublicKey.SequenceEqual(publicKey));
+        if (contact != null) ContactsListBox.SelectedItem = contact;
+    }
+
+    private void SelectContactById(string id)
+    {
+        if (!Convert.TryFromHexString(id, new byte[32], out var written)) return;
+        var key = new byte[written];
+        Convert.TryFromHexString(id, key, out _);
+        SelectContactByPublicKey(key);
     }
 
     private async void SendButton_Click(object sender, RoutedEventArgs e) => await SendMessageAsync();
-
-    private async void MessageTextBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            e.Handled = true;
-            await SendMessageAsync();
-        }
-    }
+    private async void MessageTextBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; await SendMessageAsync(); } }
 
     private async Task SendMessageAsync()
     {
         var text = MessageTextBox.Text.Trim();
         if (string.IsNullOrEmpty(text) || _client == null) return;
-
         try
         {
             if (DirectMessageCheckBox.IsChecked == true)
             {
-                if (ContactsListBox.SelectedItem is not MeshCoreContact contact)
-                    throw new InvalidOperationException("Select a contact before sending a direct message.");
-                if (contact.PublicKey.Length != 32)
-                    throw new InvalidOperationException("The selected contact has no valid 32-byte public key.");
-
+                if (ContactsListBox.SelectedItem is not MeshCoreContact contact) throw new InvalidOperationException("Select a contact before sending a direct message.");
+                if (contact.PublicKey.Length != 32) throw new InvalidOperationException("The selected contact has no valid 32-byte public key.");
                 await _client.SendDirectMessageAsync(contact.PublicKey, text);
-                _messageStore.Add(
-                    new MeshCoreMessage(contact.PublicKey.Take(6).ToArray(), null, text,
-                        (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, true),
-                    outgoing: true,
-                    peerKeyPrefix: Convert.ToHexString(contact.PublicKey.Take(6).ToArray()));
+                _messageStore.Add(new MeshCoreMessage(contact.PublicKey.Take(6).ToArray(), null, text, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, true), outgoing: true, peerKeyPrefix: Convert.ToHexString(contact.PublicKey.Take(6).ToArray()));
                 _messages.Add($"[DM → {contact.Name}] {text}");
             }
             else
             {
                 await _client.SendChannelMessageAsync(_activeChannel, text);
-                _messageStore.Add(
-                    new MeshCoreMessage(null, _activeChannel, text,
-                        (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, false),
-                    outgoing: true);
+                _messageStore.Add(new MeshCoreMessage(null, _activeChannel, text, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, false), outgoing: true);
                 _messages.Add($"[you / CH {_activeChannel}] {text}");
             }
-
             MessageTextBox.Clear();
         }
         catch (Exception ex) { StatusText.Text = $"Send failed: {ex.Message}"; }
     }
 
-    protected override void OnClosed(EventArgs e)
+    protected override void OnClosed(EventArgs e) { DisconnectClient(); base.OnClosed(e); }
+
+    private sealed class MeshCoreNodeListItem
     {
-        DisconnectClient();
-        base.OnClosed(e);
+        private readonly MeshCoreNode _node;
+        public MeshCoreNodeListItem(MeshCoreNode node) => _node = node;
+        public string DisplayName => _node.Name;
+        public MeshCoreContactType Type => _node.Type;
+        public string PositionText => _node.HasPosition ? $"{_node.Latitude:F5}, {_node.Longitude:F5}" : "No GPS";
+        public byte[] PublicKey => _node.PublicKey;
+    }
+
+    private sealed class MeshCoreMapListItem
+    {
+        private readonly MeshCoreMapNode _node;
+        public MeshCoreMapListItem(MeshCoreMapNode node) => _node = node;
+        public string Id => _node.Id;
+        public string DisplayText => $"{_node.Name} · {_node.Type} · {_node.Latitude:F5}, {_node.Longitude:F5}";
     }
 }
