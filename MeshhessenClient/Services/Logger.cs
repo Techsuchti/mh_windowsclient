@@ -1,12 +1,13 @@
 using System.Diagnostics;
+using System.IO;
 
 namespace MeshhessenClient.Services;
 
 public static class Logger
 {
-    private static readonly object Lock = new();
-    private static readonly string LogFilePath = Path.Combine(AppContext.BaseDirectory, "meshcore-windows-client.log");
-    private static StreamWriter? _writer;
+    private static readonly object _lock = new();
+    private static string? _logFilePath;
+    private static StreamWriter? _logWriter;
 
     public static event EventHandler<string>? LogMessageReceived;
 
@@ -14,11 +15,15 @@ public static class Logger
     {
         try
         {
-            var info = new FileInfo(LogFilePath);
-            if (info.Exists && info.Length > 5 * 1024 * 1024)
-                info.Delete();
-            _writer = new StreamWriter(LogFilePath, append: true) { AutoFlush = true };
-            WriteLine("=== MeshCore Windows Client started ===");
+            string appPath = AppDomain.CurrentDomain.BaseDirectory;
+            _logFilePath = Path.Combine(appPath, "meshcore-windows-client.log");
+
+            if (File.Exists(_logFilePath) && new FileInfo(_logFilePath).Length > 5 * 1024 * 1024)
+                File.Delete(_logFilePath);
+
+            _logWriter = new StreamWriter(_logFilePath, append: true) { AutoFlush = true };
+            WriteLine("=== MeshCore Windows Client gestartet ===");
+            WriteLine($"Log-Datei: {_logFilePath}");
         }
         catch (Exception ex)
         {
@@ -28,29 +33,39 @@ public static class Logger
 
     public static void WriteLine(string message)
     {
-        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
-        lock (Lock)
-        {
-            Debug.WriteLine(line);
-            try { _writer?.WriteLine(line); } catch { }
-            try { LogMessageReceived?.Invoke(null, line); } catch { }
-        }
-    }
-
-    public static string GetLogFilePath() => LogFilePath;
-
-    public static void Close()
-    {
-        lock (Lock)
+        string logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+        lock (_lock)
         {
             try
             {
-                _writer?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] === MeshCore Windows Client stopped ===");
-                _writer?.Flush();
-                _writer?.Dispose();
-                _writer = null;
+                Debug.WriteLine(logMessage);
+                _logWriter?.WriteLine(logMessage);
+                LogMessageReceived?.Invoke(null, logMessage);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Logger write failed: {ex.Message}");
+            }
+        }
+    }
+
+    public static string? GetLogFilePath() => _logFilePath;
+
+    public static void Close()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                _logWriter?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] === MeshCore Windows Client beendet ===");
+                _logWriter?.Flush();
+                _logWriter?.Dispose();
+                _logWriter = null;
+            }
+            catch
+            {
+                // Ignore shutdown logging failures.
+            }
         }
     }
 }
