@@ -16,7 +16,7 @@ public sealed class MeshCoreApplicationController : IDisposable
     public event EventHandler<MeshCoreDeviceInfo>? DeviceChanged;
     public event EventHandler<MeshCoreSelfInfo>? SelfChanged;
     public event EventHandler<IReadOnlyList<MeshCoreContact>>? ContactsChanged;
-    public event EventHandler<IReadOnlyCollection<MeshCoreNode>>? NodesChanged;
+    public event EventHandler<IReadOnlyList<MeshCoreNode>>? NodesChanged;
     public event EventHandler<MeshCoreChannel>? ChannelReceived;
     public event EventHandler<MeshCoreMessage>? MessageReceived;
     public event EventHandler<byte[]>? PushReceived;
@@ -54,9 +54,9 @@ public sealed class MeshCoreApplicationController : IDisposable
 
     private void OnContactsSynchronized(object? sender, IReadOnlyList<MeshCoreContact> contacts)
     {
-        NodeRegistry.ReplaceContacts(contacts);
+        NodeRegistry.UpsertRange(contacts);
         ContactsChanged?.Invoke(this, contacts);
-        NodesChanged?.Invoke(this, NodeRegistry.Nodes);
+        NodesChanged?.Invoke(this, NodeRegistry.Snapshot());
     }
 
     public void Dispose()
