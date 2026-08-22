@@ -18,46 +18,40 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Restore
+      - name: Restore solution
         run: dotnet restore MeshhessenClient.sln
-
-      - name: Test
-        run: dotnet test MeshhessenClient.sln -c Release --no-restore --verbosity normal
+      - name: Test MeshCore client
+        run: dotnet test MeshhessenClient.Tests/MeshhessenClient.Tests.csproj -c Release --no-restore --verbosity normal
 
   build:
     runs-on: windows-latest
     needs: test
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-
-      - name: Restore dependencies
+      - name: Restore client
         run: dotnet restore MeshhessenClient/MeshhessenClient.csproj
-
+      - name: Build client
+        run: dotnet build MeshhessenClient/MeshhessenClient.csproj -c Release --no-restore
       - name: Publish standalone EXE
         run: dotnet publish MeshhessenClient/MeshhessenClient.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o publish_output
-
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MeshCoreWindowsClient-win-x64
+          path: publish_output/MeshCoreWindowsClient.exe
+          if-no-files-found: error
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -68,23 +62,19 @@ jobs:
 
             Native Windows client for MeshCore Companion radios.
 
-            ### Current transport
+            ### Transports
             - MeshCore Companion over USB/Serial
-            - 115200 baud default
-            - Contacts, channels and channel messaging
-            - MeshCore Companion startup synchronization
+            - MeshCore Companion over BLE
+            - MeshCore Companion over TCP streams
 
-            ### Planned
-            - BLE Companion
-            - TCP Companion
-            - Direct messages
-            - Repeater and Room Server management
-            - KISS modem protocol
-
-            ### Requirements
-            - Windows 10/11 x64
-            - MeshCore Companion firmware
-            - USB/Serial connection for the current release
+            ### Current features
+            - Companion startup synchronization
+            - Device and self information
+            - Contact synchronization
+            - Channel synchronization
+            - Channel messaging
+            - Direct-message command support
+            - KISS codec foundation
           files: publish_output/MeshCoreWindowsClient.exe
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
