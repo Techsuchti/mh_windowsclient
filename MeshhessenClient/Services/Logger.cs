@@ -1,95 +1,56 @@
-﻿using System.Diagnostics;
-using System.IO;
+using System.Diagnostics;
 
 namespace MeshhessenClient.Services;
 
 public static class Logger
 {
-    private static readonly object _lock = new();
-    private static string? _logFilePath;
-    private static StreamWriter? _logWriter;
+    private static readonly object Lock = new();
+    private static readonly string LogFilePath = Path.Combine(AppContext.BaseDirectory, "meshcore-windows-client.log");
+    private static StreamWriter? _writer;
 
-    // Event für UI-Updates
     public static event EventHandler<string>? LogMessageReceived;
 
     static Logger()
     {
         try
         {
-            // Log-Datei im Anwendungsverzeichnis erstellen
-            string appPath = AppDomain.CurrentDomain.BaseDirectory;
-            _logFilePath = Path.Combine(appPath, "meshhessen-client.log");
-
-            // Alte Log-Datei löschen wenn größer als 5MB
-            if (File.Exists(_logFilePath))
-            {
-                var fileInfo = new FileInfo(_logFilePath);
-                if (fileInfo.Length > 5 * 1024 * 1024) // 5MB
-                {
-                    File.Delete(_logFilePath);
-                }
-            }
-
-            // StreamWriter für Log-Datei öffnen
-            _logWriter = new StreamWriter(_logFilePath, append: true)
-            {
-                AutoFlush = true
-            };
-
-            WriteLine("=== Meshhessen Client gestartet ===");
-            WriteLine($"Log-Datei: {_logFilePath}");
+            var info = new FileInfo(LogFilePath);
+            if (info.Exists && info.Length > 5 * 1024 * 1024)
+                info.Delete();
+            _writer = new StreamWriter(LogFilePath, append: true) { AutoFlush = true };
+            WriteLine("=== MeshCore Windows Client started ===");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"Fehler beim Initialisieren des Loggers: {ex.Message}");
+            Debug.WriteLine($"Logger initialization failed: {ex.Message}");
         }
     }
 
     public static void WriteLine(string message)
     {
-        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-        string logMessage = $"[{timestamp}] {message}";
-
-        lock (_lock)
+        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+        lock (Lock)
         {
-            try
-            {
-                // In Debug-Ausgabe schreiben (für Visual Studio / DebugView)
-                Debug.WriteLine(logMessage);
-
-                // In Log-Datei schreiben
-                _logWriter?.WriteLine(logMessage);
-
-                // Event für UI-Update auslösen
-                LogMessageReceived?.Invoke(null, logMessage);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Fehler beim Schreiben ins Log: {ex.Message}");
-            }
+            Debug.WriteLine(line);
+            try { _writer?.WriteLine(line); } catch { }
+            try { LogMessageReceived?.Invoke(null, line); } catch { }
         }
     }
 
-    public static string? GetLogFilePath()
-    {
-        return _logFilePath;
-    }
+    public static string GetLogFilePath() => LogFilePath;
 
     public static void Close()
     {
-        lock (_lock)
+        lock (Lock)
         {
             try
             {
-                WriteLine("=== Meshhessen Client beendet ===");
-                _logWriter?.Flush();
-                _logWriter?.Close();
-                _logWriter?.Dispose();
+                _writer?.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] === MeshCore Windows Client stopped ===");
+                _writer?.Flush();
+                _writer?.Dispose();
+                _writer = null;
             }
-            catch
-            {
-                // Ignorieren
-            }
+            catch { }
         }
     }
 }
