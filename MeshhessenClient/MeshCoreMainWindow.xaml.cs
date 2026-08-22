@@ -250,10 +250,16 @@ public partial class MeshCoreMainWindow : Window
 
     private void SelectContactById(string id)
     {
-        if (!Convert.TryFromHexString(id, new byte[32], out var written)) return;
-        var key = new byte[written];
-        Convert.TryFromHexString(id, key, out _);
-        SelectContactByPublicKey(key);
+        try
+        {
+            var key = Convert.FromHexString(id);
+            if (key.Length != 32) return;
+            SelectContactByPublicKey(key);
+        }
+        catch (FormatException)
+        {
+            // Ignore malformed node IDs.
+        }
     }
 
     private async void SendButton_Click(object sender, RoutedEventArgs e) => await SendMessageAsync();
@@ -293,7 +299,7 @@ public partial class MeshCoreMainWindow : Window
         public string DisplayName => _node.Name;
         public MeshCoreContactType Type => _node.Type;
         public string PositionText => _node.HasPosition ? $"{_node.Latitude:F5}, {_node.Longitude:F5}" : "No GPS";
-        public byte[] PublicKey => _node.PublicKey;
+        public byte[] PublicKey => Convert.FromHexString(_node.PublicKeyHex);
     }
 
     private sealed class MeshCoreMapListItem
