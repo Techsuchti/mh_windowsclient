@@ -31,6 +31,7 @@ public partial class MeshCoreMainWindow : Window
         MessagesListBox.ItemsSource = _messages;
         NodesListBox.ItemsSource = _nodes;
         MapNodesListBox.ItemsSource = _mapNodes;
+        MeshCoreMap.NodeClicked += MeshCoreMap_NodeClicked;
         RefreshSerialPorts();
         UpdateTransportUi();
     }
@@ -165,6 +166,7 @@ public partial class MeshCoreMainWindow : Window
         _nodes.Clear();
         _mapNodes.Clear();
         _messages.Clear();
+        MeshCoreMap.SetNodes(Array.Empty<MeshCoreMapNode>());
         NodeCountText.Text = "0 nodes";
         ConnectButton.Content = "Connect";
         StatusText.Text = "Disconnected";
@@ -189,13 +191,15 @@ public partial class MeshCoreMainWindow : Window
     {
         if (_client == null) return;
         var nodes = _client.NodeRegistry.Snapshot();
+        var mapNodes = MeshCoreMapProjection.WithPosition(nodes).ToArray();
         Dispatcher.Invoke(() =>
         {
             _nodes.Clear();
             foreach (var node in nodes) _nodes.Add(new MeshCoreNodeListItem(node));
             _mapNodes.Clear();
-            foreach (var mapNode in MeshCoreMapProjection.WithPosition(nodes)) _mapNodes.Add(new MeshCoreMapListItem(mapNode));
-            NodeCountText.Text = $"{nodes.Count} nodes | {_mapNodes.Count} with GPS";
+            foreach (var mapNode in mapNodes) _mapNodes.Add(new MeshCoreMapListItem(mapNode));
+            MeshCoreMap.SetNodes(mapNodes);
+            NodeCountText.Text = $"{nodes.Count} nodes | {mapNodes.Length} with GPS";
         });
     }
 
@@ -240,6 +244,12 @@ public partial class MeshCoreMainWindow : Window
             StatusText.Text = $"Selected {node.DisplayText}";
             SelectContactById(node.Id);
         }
+    }
+
+    private void MeshCoreMap_NodeClicked(object? sender, MeshCoreMapNode node)
+    {
+        StatusText.Text = $"Selected {node.Name} ({node.Type}) — {node.Latitude:F5}, {node.Longitude:F5}";
+        SelectContactById(node.Id);
     }
 
     private void SelectContactByPublicKey(byte[] publicKey)
