@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
@@ -22,8 +22,7 @@
     <Description>Windows Desktop Client für MeshCore Companion Radios</Description>
   </PropertyGroup>
 
-  <!-- The old Meshtastic application remains in the repository for history, but is
-       deliberately excluded from compilation. This project is now MeshCore-only. -->
+  <!-- Legacy Meshtastic source remains in git history but is deliberately excluded. -->
   <ItemGroup>
     <Compile Remove="**\*.cs" />
     <Compile Include="App.xaml.cs" />
@@ -32,6 +31,7 @@
     <Compile Include="Services\SerialConnectionService.cs" />
     <Compile Include="Services\Logger.cs" />
     <Compile Include="Services\MeshCoreBluetoothConnectionService.cs" />
+    <Compile Include="Services\MeshCoreTcpConnectionService.cs" />
     <Compile Include="Protocols\MeshCore\**\*.cs" />
 
     <Page Remove="**\*.xaml" />
