@@ -38,11 +38,7 @@ public partial class MeshCoreMainWindow : Window
         else if (GetTransport() == ConnectionType.Serial) RefreshSerialPorts();
     }
 
-    private void TransportComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!IsInitialized) return;
-        UpdateTransportUi();
-    }
+    private void TransportComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) { if (!IsInitialized) return; UpdateTransportUi(); }
 
     private ConnectionType GetTransport()
     {
@@ -76,9 +72,7 @@ public partial class MeshCoreMainWindow : Window
             StatusText.Text = "Scanning for MeshCore BLE devices...";
             var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(false);
             var devices = await DeviceInformation.FindAllAsync(selector);
-            var candidates = devices.Where(d => !string.IsNullOrWhiteSpace(d.Name))
-                .Where(d => d.Name.Contains("MeshCore", StringComparison.OrdinalIgnoreCase) || d.Name.Contains("Companion", StringComparison.OrdinalIgnoreCase))
-                .OrderBy(d => d.Name).ToArray();
+            var candidates = devices.Where(d => !string.IsNullOrWhiteSpace(d.Name)).Where(d => d.Name.Contains("MeshCore", StringComparison.OrdinalIgnoreCase) || d.Name.Contains("Companion", StringComparison.OrdinalIgnoreCase)).OrderBy(d => d.Name).ToArray();
             PortComboBox.ItemsSource = candidates;
             PortComboBox.DisplayMemberPath = "Name";
             if (candidates.Length > 0) PortComboBox.SelectedIndex = 0;
@@ -152,3 +146,12 @@ public partial class MeshCoreMainWindow : Window
     private void ContactsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e) { }
     private async void SendButton_Click(object sender, RoutedEventArgs e) => await SendMessageAsync();
     private async void MessageTextBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; await SendMessageAsync(); } }
+    private async Task SendMessageAsync()
+    {
+        var text = MessageTextBox.Text.Trim();
+        if (string.IsNullOrEmpty(text) || _client == null) return;
+        try { await _client.SendChannelMessageAsync(_activeChannel, text); _messages.Add($"[you] {text}"); MessageTextBox.Clear(); }
+        catch (Exception ex) { StatusText.Text = $"Send failed: {ex.Message}"; }
+    }
+    protected override void OnClosed(EventArgs e) { DisconnectClient(); base.OnClosed(e); }
+}
