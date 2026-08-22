@@ -10,7 +10,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-
         <DockPanel Grid.Row="0" Margin="0,0,0,12">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                 <TextBlock Text="MeshCore" FontSize="28" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -34,28 +33,24 @@
                 <Button x:Name="ConnectButton" Content="Connect" Click="ConnectButton_Click" Margin="4,0" Padding="16,6"/>
             </StackPanel>
         </DockPanel>
-
         <Border Grid.Row="1" Padding="10" CornerRadius="6" Background="#22000000" Margin="0,0,0,12">
             <DockPanel>
                 <TextBlock x:Name="StatusText" Text="Disconnected" FontWeight="SemiBold"/>
                 <TextBlock x:Name="DeviceText" DockPanel.Dock="Right" Text="No MeshCore device" Opacity="0.8"/>
             </DockPanel>
         </Border>
-
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="280"/>
                 <ColumnDefinition Width="320"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-
             <GroupBox Header="Nodes" Grid.Column="0" Margin="0,0,8,0">
                 <DockPanel>
                     <TextBlock x:Name="NodeCountText" DockPanel.Dock="Bottom" Margin="4" Opacity="0.7" Text="0 nodes"/>
                     <ListBox x:Name="NodesListBox" DisplayMemberPath="DisplayName" SelectionChanged="NodesListBox_SelectionChanged"/>
                 </DockPanel>
             </GroupBox>
-
             <GroupBox Header="Channels / Contacts" Grid.Column="1" Margin="0,0,8,0">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -66,22 +61,18 @@
                     <ListBox x:Name="ChannelsListBox" Grid.Row="1" DisplayMemberPath="Name" SelectionChanged="ChannelsListBox_SelectionChanged"/>
                 </Grid>
             </GroupBox>
-
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-
                 <GroupBox Header="MeshCore Map" Grid.Row="0">
-                    <controls:MeshCoreMapCanvas x:Name="MeshCoreMap" NodeClicked="MeshCoreMap_NodeClicked"/>
+                    <controls:MeshCoreMapCanvas x:Name="MeshCoreMap"/>
                 </GroupBox>
-
                 <GroupBox Header="Messages" Grid.Row="1" Margin="0,8,0,0">
                     <ListBox x:Name="MessagesListBox" Height="180"/>
                 </GroupBox>
-
                 <DockPanel Grid.Row="2" Margin="0,8,0,0">
                     <CheckBox x:Name="DirectMessageCheckBox" Content="DM selected contact" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <TextBox x:Name="MessageTextBox" Height="38" AcceptsReturn="False" VerticalContentAlignment="Center" KeyDown="MessageTextBox_KeyDown"/>
