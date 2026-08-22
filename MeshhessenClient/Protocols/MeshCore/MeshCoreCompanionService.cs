@@ -43,8 +43,7 @@ public sealed class MeshCoreCompanionService : IDisposable
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default) =>
-        SendPayloadAsync(new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 3 }, cancellationToken);
+    public Task RequestDeviceInfoAsync(CancellationToken cancellationToken = default) => SendPayloadAsync(new byte[] { MeshCoreProtocolConstants.CmdDeviceQuery, 3 }, cancellationToken);
 
     public Task RequestContactsAsync(uint? since = null, CancellationToken cancellationToken = default)
     {
@@ -75,8 +74,9 @@ public sealed class MeshCoreCompanionService : IDisposable
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public async Task SendDirectMessageAsync(ReadOnlySpan<byte> destinationPublicKey, string text, CancellationToken cancellationToken = default)
+    public async Task SendDirectMessageAsync(byte[] destinationPublicKey, string text, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(destinationPublicKey);
         if (destinationPublicKey.Length != 32) throw new ArgumentException("MeshCore public keys are 32 bytes.", nameof(destinationPublicKey));
         ValidateText(text);
         var bytes = Encoding.UTF8.GetBytes(text);
@@ -89,8 +89,7 @@ public sealed class MeshCoreCompanionService : IDisposable
         await SendPayloadAsync(payload, cancellationToken);
     }
 
-    public Task SyncNextMessageAsync(CancellationToken cancellationToken = default) =>
-        SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, cancellationToken);
+    public Task SyncNextMessageAsync(CancellationToken cancellationToken = default) => SendPayloadAsync(new[] { MeshCoreProtocolConstants.CmdSyncNextMessage }, cancellationToken);
 
     private async Task SendPayloadAsync(byte[] payload, CancellationToken cancellationToken)
     {
@@ -137,18 +136,7 @@ public sealed class MeshCoreCompanionService : IDisposable
     private void ParseSelfInfo(ReadOnlySpan<byte> data)
     {
         if (data.Length < 58) throw new InvalidDataException("SELF_INFO packet is too short.");
-        var info = new MeshCoreSelfInfo(
-            (MeshCoreContactType)data[1],
-            unchecked((sbyte)data[2]),
-            unchecked((sbyte)data[3]),
-            data.Slice(4, 32).ToArray(),
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(36, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(40, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d,
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4)) / 1000d,
-            data[56],
-            data[57],
-            ReadUtf8(data.Slice(58)));
+        var info = new MeshCoreSelfInfo((MeshCoreContactType)data[1], unchecked((sbyte)data[2]), unchecked((sbyte)data[3]), data.Slice(4, 32).ToArray(), BinaryPrimitives.ReadInt32LittleEndian(data.Slice(36, 4)) / 1_000_000d, BinaryPrimitives.ReadInt32LittleEndian(data.Slice(40, 4)) / 1_000_000d, BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(48, 4)) / 1000d, BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(52, 4)) / 1000d, data[56], data[57], ReadUtf8(data.Slice(58)));
         SelfInfo = info;
         SelfInfoReceived?.Invoke(this, info);
         _ = RequestDeviceInfoAsync();
@@ -171,16 +159,7 @@ public sealed class MeshCoreCompanionService : IDisposable
     private void ParseContact(ReadOnlySpan<byte> data)
     {
         if (data.Length < 148) throw new InvalidDataException("CONTACT packet is too short.");
-        _contacts.Add(new MeshCoreContact(
-            data.Slice(1, 32).ToArray(),
-            (MeshCoreContactType)data[33],
-            data[34],
-            unchecked((sbyte)data[35]),
-            data.Slice(36, 64).ToArray(),
-            ReadFixedUtf8(data.Slice(100, 32)),
-            BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(132, 4)),
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(136, 4)) / 1_000_000d,
-            BinaryPrimitives.ReadInt32LittleEndian(data.Slice(140, 4)) / 1_000_000d));
+        _contacts.Add(new MeshCoreContact(data.Slice(1, 32).ToArray(), (MeshCoreContactType)data[33], data[34], unchecked((sbyte)data[35]), data.Slice(36, 64).ToArray(), ReadFixedUtf8(data.Slice(100, 32)), BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(132, 4)), BinaryPrimitives.ReadInt32LittleEndian(data.Slice(136, 4)) / 1_000_000d, BinaryPrimitives.ReadInt32LittleEndian(data.Slice(140, 4)) / 1_000_000d));
     }
 
     private void ParseChannel(ReadOnlySpan<byte> data)
@@ -195,55 +174,24 @@ public sealed class MeshCoreCompanionService : IDisposable
         var isV3 = data[0] is MeshCoreProtocolConstants.RespContactMessageV3 or MeshCoreProtocolConstants.RespChannelMessageV3;
         var offset = 1;
         double? snr = null;
-
-        if (isV3)
-        {
-            if (data.Length < 4) throw new InvalidDataException("V3 message packet is too short.");
-            snr = unchecked((sbyte)data[1]) / 4.0;
-            offset = 4;
-        }
-
+        if (isV3) { if (data.Length < 4) throw new InvalidDataException("V3 message packet is too short."); snr = unchecked((sbyte)data[1]) / 4.0; offset = 4; }
         byte[]? senderPrefix = null;
         byte? channel = null;
         byte pathLength;
         byte textType;
         uint timestamp;
-
         if (isContact)
         {
             if (data.Length < offset + 10) throw new InvalidDataException("CONTACT_MSG packet is too short.");
-            senderPrefix = data.Slice(offset, 6).ToArray();
-            offset += 6;
-            pathLength = data[offset++];
-            textType = data[offset++];
-            timestamp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
-            offset += 4;
+            senderPrefix = data.Slice(offset, 6).ToArray(); offset += 6; pathLength = data[offset++]; textType = data[offset++]; timestamp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4)); offset += 4;
         }
         else
         {
             if (data.Length < offset + 7) throw new InvalidDataException("CHANNEL_MSG packet is too short.");
-            channel = data[offset++];
-            pathLength = data[offset++];
-            textType = data[offset++];
-            timestamp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4));
-            offset += 4;
+            channel = data[offset++]; pathLength = data[offset++]; textType = data[offset++]; timestamp = BinaryPrimitives.ReadUInt32LittleEndian(data.Slice(offset, 4)); offset += 4;
         }
-
-        if (textType == 2)
-        {
-            if (data.Length < offset + 4) throw new InvalidDataException("Signed message is missing its signature.");
-            offset += 4;
-        }
-
-        MessageReceived?.Invoke(this, new MeshCoreMessage(
-            senderPrefix,
-            channel,
-            ReadUtf8(data.Slice(offset)),
-            timestamp,
-            snr,
-            isContact,
-            textType,
-            pathLength));
+        if (textType == 2) { if (data.Length < offset + 4) throw new InvalidDataException("Signed message is missing its signature."); offset += 4; }
+        MessageReceived?.Invoke(this, new MeshCoreMessage(senderPrefix, channel, ReadUtf8(data.Slice(offset)), timestamp, snr, isContact, textType, pathLength));
     }
 
     private static void ValidateText(string text) { if (string.IsNullOrWhiteSpace(text)) throw new ArgumentException("Message text must not be empty.", nameof(text)); }
