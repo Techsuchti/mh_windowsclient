@@ -27,6 +27,7 @@
     <Compile Remove="**\*.cs" />
     <Compile Include="App.xaml.cs" />
     <Compile Include="MeshCoreMainWindow.xaml.cs" />
+    <Compile Include="Controls\MeshCoreMapCanvas.xaml.cs" />
     <Compile Include="Services\IConnectionService.cs" />
     <Compile Include="Services\SerialConnectionService.cs" />
     <Compile Include="Services\Logger.cs" />
@@ -37,6 +38,7 @@
     <ApplicationDefinition Remove="**\*.xaml" />
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MeshCoreMainWindow.xaml" />
+    <Page Include="Controls\MeshCoreMapCanvas.xaml" />
   </ItemGroup>
 
   <ItemGroup>
