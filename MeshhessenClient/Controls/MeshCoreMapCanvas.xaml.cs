@@ -14,7 +14,7 @@ public partial class MeshCoreMapCanvas : UserControl
     private Point _dragStart;
     private bool _dragging;
 
-    public event EventHandler<MeshCoreMapNode>? NodeClicked;
+    public event Action<MeshCoreMapNode>? NodeClicked;
 
     public MeshCoreMapCanvas()
     {
@@ -60,7 +60,7 @@ public partial class MeshCoreMapCanvas : UserControl
     {
         if (sender is FrameworkElement { Tag: string id } && _nodes.TryGetValue(id, out var node))
         {
-            NodeClicked?.Invoke(this, node);
+            NodeClicked?.Invoke(node);
             e.Handled = true;
         }
     }
