@@ -1,6 +1,7 @@
 <Window x:Class="MeshhessenClient.MeshCoreMainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MeshhessenClient.Controls"
         Title="MeshCore Windows Client" Height="760" Width="1250"
         MinHeight="600" MinWidth="950">
     <Grid Margin="16">
@@ -73,11 +74,8 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <GroupBox Header="Node / Map Data" Grid.Row="0">
-                    <DockPanel Margin="8">
-                        <TextBlock x:Name="MapHintText" DockPanel.Dock="Top" Text="Nodes with GPS coordinates appear here." Margin="0,0,0,8" Opacity="0.7"/>
-                        <ListBox x:Name="MapNodesListBox" DisplayMemberPath="DisplayText" SelectionChanged="MapNodesListBox_SelectionChanged"/>
-                    </DockPanel>
+                <GroupBox Header="MeshCore Map" Grid.Row="0">
+                    <controls:MeshCoreMapCanvas x:Name="MeshCoreMap" NodeClicked="MeshCoreMap_NodeClicked"/>
                 </GroupBox>
 
                 <GroupBox Header="Messages" Grid.Row="1" Margin="0,8,0,0">
