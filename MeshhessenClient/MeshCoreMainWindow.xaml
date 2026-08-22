@@ -43,28 +43,48 @@
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="300"/>
-                <ColumnDefinition Width="300"/>
+                <ColumnDefinition Width="280"/>
+                <ColumnDefinition Width="320"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <GroupBox Header="Contacts" Grid.Column="0" Margin="0,0,8,0">
-                <ListBox x:Name="ContactsListBox" DisplayMemberPath="Name" SelectionChanged="ContactsListBox_SelectionChanged"/>
+            <GroupBox Header="Nodes" Grid.Column="0" Margin="0,0,8,0">
+                <DockPanel>
+                    <TextBlock x:Name="NodeCountText" DockPanel.Dock="Bottom" Margin="4" Opacity="0.7" Text="0 nodes"/>
+                    <ListBox x:Name="NodesListBox" DisplayMemberPath="DisplayName" SelectionChanged="NodesListBox_SelectionChanged"/>
+                </DockPanel>
             </GroupBox>
 
-            <GroupBox Header="Channels" Grid.Column="1" Margin="0,0,8,0">
-                <ListBox x:Name="ChannelsListBox" DisplayMemberPath="Name" SelectionChanged="ChannelsListBox_SelectionChanged"/>
+            <GroupBox Header="Channels / Contacts" Grid.Column="1" Margin="0,0,8,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <ListBox x:Name="ContactsListBox" Grid.Row="0" DisplayMemberPath="Name" SelectionChanged="ContactsListBox_SelectionChanged"/>
+                    <ListBox x:Name="ChannelsListBox" Grid.Row="1" DisplayMemberPath="Name" SelectionChanged="ChannelsListBox_SelectionChanged"/>
+                </Grid>
             </GroupBox>
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <GroupBox Header="Messages" Grid.Row="0">
-                    <ListBox x:Name="MessagesListBox"/>
+
+                <GroupBox Header="Node / Map Data" Grid.Row="0">
+                    <DockPanel Margin="8">
+                        <TextBlock x:Name="MapHintText" DockPanel.Dock="Top" Text="Nodes with GPS coordinates appear here." Margin="0,0,0,8" Opacity="0.7"/>
+                        <ListBox x:Name="MapNodesListBox" DisplayMemberPath="DisplayText" SelectionChanged="MapNodesListBox_SelectionChanged"/>
+                    </DockPanel>
                 </GroupBox>
-                <DockPanel Grid.Row="1" Margin="0,8,0,0">
+
+                <GroupBox Header="Messages" Grid.Row="1" Margin="0,8,0,0">
+                    <ListBox x:Name="MessagesListBox" Height="180"/>
+                </GroupBox>
+
+                <DockPanel Grid.Row="2" Margin="0,8,0,0">
                     <CheckBox x:Name="DirectMessageCheckBox" Content="DM selected contact" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <TextBox x:Name="MessageTextBox" Height="38" AcceptsReturn="False" VerticalContentAlignment="Center" KeyDown="MessageTextBox_KeyDown"/>
                     <Button Content="Send" Width="90" Margin="8,0,0,0" Click="SendButton_Click"/>
