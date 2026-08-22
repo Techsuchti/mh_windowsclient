@@ -9,15 +9,20 @@ public sealed class MeshCoreKissConnectionService : IConnectionService
     private SerialPort? _serial;
     private readonly MeshCoreKissCodec _codec = new();
 
+    public ConnectionType Type => ConnectionType.Kiss;
+    public string DisplayName => _serial?.PortName ?? "MeshCore KISS";
     public bool IsConnected => _serial?.IsOpen == true;
     public event EventHandler<byte[]>? DataReceived;
     public event EventHandler<bool>? ConnectionStateChanged;
 
-    public Task ConnectAsync(ConnectionParameters parameters, CancellationToken cancellationToken = default)
+    public Task ConnectAsync(ConnectionParameters parameters)
     {
-        if (parameters is not SerialConnectionParameters serial)
-            throw new ArgumentException("KISS requires serial connection parameters.", nameof(parameters));
+        if (parameters is not KissConnectionParameters serial)
+            throw new ArgumentException("KISS requires KissConnectionParameters.", nameof(parameters));
+        if (string.IsNullOrWhiteSpace(serial.PortName))
+            throw new ArgumentException("KISS port name cannot be empty.", nameof(parameters));
 
+        Disconnect();
         _serial = new SerialPort(serial.PortName, serial.BaudRate)
         {
             ReadTimeout = 500,
@@ -31,10 +36,11 @@ public sealed class MeshCoreKissConnectionService : IConnectionService
         return Task.CompletedTask;
     }
 
-    public Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken = default)
+    public Task WriteAsync(byte[] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
         if (!IsConnected) throw new InvalidOperationException("KISS connection is not open.");
-        var frame = _codec.Encode(data.Span);
+        var frame = _codec.Encode(data);
         _serial!.Write(frame, 0, frame.Length);
         return Task.CompletedTask;
     }
