@@ -30,8 +30,7 @@
     <Compile Include="Services\IConnectionService.cs" />
     <Compile Include="Services\SerialConnectionService.cs" />
     <Compile Include="Services\Logger.cs" />
-    <Compile Include="Services\MeshCoreBluetoothConnectionService.cs" />
-    <Compile Include="Services\MeshCoreTcpConnectionService.cs" />
+    <Compile Include="Services\MeshCore*.cs" />
     <Compile Include="Protocols\MeshCore\**\*.cs" />
 
     <Page Remove="**\*.xaml" />
