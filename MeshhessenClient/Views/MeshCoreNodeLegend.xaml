@@ -1,0 +1,12 @@
+<UserControl x:Class="MeshhessenClient.Views.MeshCoreNodeLegend"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="#CC10151B" CornerRadius="6" Padding="10" Margin="8">
+        <StackPanel>
+            <TextBlock Text="MeshCore Network" Foreground="White" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBlock Text="● Companion" Foreground="White"/>
+            <TextBlock Text="● Repeater" Foreground="White"/>
+            <TextBlock Text="● Room Server" Foreground="White"/>
+        </StackPanel>
+    </Border>
+</UserControl>
