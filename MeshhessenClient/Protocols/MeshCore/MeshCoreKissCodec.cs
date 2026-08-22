@@ -27,8 +27,10 @@ public sealed class MeshCoreKissCodec
         return output.ToArray();
     }
 
-    public IEnumerable<byte[]> Feed(ReadOnlySpan<byte> data)
+    public IEnumerable<byte[]> Feed(byte[] data)
     {
+        ArgumentNullException.ThrowIfNull(data);
+        var frames = new List<byte[]>();
         foreach (var b in data)
         {
             if (b == Fend)
@@ -36,30 +38,23 @@ public sealed class MeshCoreKissCodec
                 if (_inFrame && _buffer.Count > 1)
                 {
                     var frame = _buffer.Skip(1).ToArray();
-                    if (frame.Length > 0) yield return frame;
+                    if (frame.Length > 0) frames.Add(frame);
                 }
                 _buffer.Clear();
                 _escaped = false;
                 _inFrame = true;
                 continue;
             }
-
             if (!_inFrame) continue;
-
             if (_escaped)
             {
-                _buffer.Add(b switch
-                {
-                    Tfec => Fend,
-                    Tfesc => Fesc,
-                    _ => b
-                });
+                _buffer.Add(b switch { Tfec => Fend, Tfesc => Fesc, _ => b });
                 _escaped = false;
                 continue;
             }
-
             if (b == Fesc) { _escaped = true; continue; }
             _buffer.Add(b);
         }
+        return frames;
     }
 }
