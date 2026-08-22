@@ -16,7 +16,7 @@ public sealed class MeshCoreApplicationController : IDisposable
     public event EventHandler<MeshCoreDeviceInfo>? DeviceChanged;
     public event EventHandler<MeshCoreSelfInfo>? SelfChanged;
     public event EventHandler<IReadOnlyList<MeshCoreContact>>? ContactsChanged;
-    public event EventHandler<IReadOnlyList<MeshCoreNode>>? NodesChanged;
+    public event EventHandler? NodesChanged;
     public event EventHandler<MeshCoreChannel>? ChannelReceived;
     public event EventHandler<MeshCoreMessage>? MessageReceived;
     public event EventHandler<byte[]>? PushReceived;
@@ -56,7 +56,7 @@ public sealed class MeshCoreApplicationController : IDisposable
     {
         NodeRegistry.UpsertRange(contacts);
         ContactsChanged?.Invoke(this, contacts);
-        NodesChanged?.Invoke(this, NodeRegistry.Snapshot());
+        NodesChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void Dispose()
