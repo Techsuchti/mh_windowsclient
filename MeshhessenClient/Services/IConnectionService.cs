@@ -8,10 +8,11 @@ public enum ConnectionType
 {
     Serial,
     Bluetooth,
-    Tcp
+    Tcp,
+    Kiss
 }
 
-/// <summary>Transport-agnostic connection used by the MeshCore Companion protocol.</summary>
+/// <summary>Transport-agnostic connection used by MeshCore protocols.</summary>
 public interface IConnectionService : IDisposable
 {
     ConnectionType Type { get; }
@@ -29,7 +30,7 @@ public abstract class ConnectionParameters
     public ConnectionType Type { get; init; }
 }
 
-public sealed class SerialConnectionParameters : ConnectionParameters
+public class SerialConnectionParameters : ConnectionParameters
 {
     public string PortName { get; init; } = string.Empty;
     public int BaudRate { get; init; } = 115200;
@@ -43,10 +44,14 @@ public sealed class BluetoothConnectionParameters : ConnectionParameters
     public BluetoothConnectionParameters() => Type = ConnectionType.Bluetooth;
 }
 
-/// <summary>TCP endpoint for a MeshCore Companion stream connection.</summary>
 public sealed class TcpConnectionParameters : ConnectionParameters
 {
     public string Hostname { get; init; } = string.Empty;
     public int Port { get; init; } = 4403;
     public TcpConnectionParameters() => Type = ConnectionType.Tcp;
+}
+
+public sealed class KissConnectionParameters : SerialConnectionParameters
+{
+    public KissConnectionParameters() => Type = ConnectionType.Kiss;
 }
