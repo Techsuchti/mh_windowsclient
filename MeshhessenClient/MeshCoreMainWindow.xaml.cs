@@ -30,7 +30,7 @@ public partial class MeshCoreMainWindow : Window
         ChannelsListBox.ItemsSource = _channels;
         MessagesListBox.ItemsSource = _messages;
         NodesListBox.ItemsSource = _nodes;
-        MapNodesListBox.ItemsSource = _mapNodes;
+        if (MapNodesListBox != null) MapNodesListBox.ItemsSource = _mapNodes;
         MeshCoreMap.NodeClicked += MeshCoreMap_NodeClicked;
         RefreshSerialPorts();
         UpdateTransportUi();
@@ -74,6 +74,7 @@ public partial class MeshCoreMainWindow : Window
 
     private void RefreshSerialPorts()
     {
+        PortComboBox.DisplayMemberPath = string.Empty;
         PortComboBox.ItemsSource = SerialPort.GetPortNames().OrderBy(x => x).ToArray();
         if (PortComboBox.Items.Count > 0) PortComboBox.SelectedIndex = 0;
     }
@@ -83,19 +84,36 @@ public partial class MeshCoreMainWindow : Window
         try
         {
             StatusText.Text = "Scanning for MeshCore BLE devices...";
-            var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(false);
+            PortComboBox.ItemsSource = null;
+            PortComboBox.DisplayMemberPath = "Name";
+
+            // Do not restrict the scan to paired devices. MeshCore Companions can be
+            // discoverable before Windows pairing and can then be opened by address.
+            var selector = BluetoothLEDevice.GetDeviceSelector();
             var devices = await DeviceInformation.FindAllAsync(selector);
             var candidates = devices
                 .Where(d => !string.IsNullOrWhiteSpace(d.Name))
-                .Where(d => d.Name.Contains("MeshCore", StringComparison.OrdinalIgnoreCase) || d.Name.Contains("Companion", StringComparison.OrdinalIgnoreCase))
+                .Where(d => d.Name.Contains("MeshCore", StringComparison.OrdinalIgnoreCase)
+                         || d.Name.Contains("Companion", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(d => d.Name)
+                .ThenBy(d => d.Id)
                 .ToArray();
+
             PortComboBox.ItemsSource = candidates;
-            PortComboBox.DisplayMemberPath = "Name";
-            if (candidates.Length > 0) PortComboBox.SelectedIndex = 0;
-            StatusText.Text = candidates.Length == 0 ? "No MeshCore BLE device found. Pair the Companion in Windows first." : $"Found {candidates.Length} MeshCore BLE device(s).";
+            if (candidates.Length > 0)
+            {
+                PortComboBox.SelectedIndex = 0;
+                StatusText.Text = $"Found {candidates.Length} MeshCore BLE device(s).";
+            }
+            else
+            {
+                StatusText.Text = "No MeshCore BLE device found. Power on the Companion and enable Bluetooth.";
+            }
         }
-        catch (Exception ex) { StatusText.Text = $"BLE scan failed: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"BLE scan failed: {ex.Message}";
+        }
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -257,66 +275,3 @@ public partial class MeshCoreMainWindow : Window
         var contact = _contacts.FirstOrDefault(c => c.PublicKey.SequenceEqual(publicKey));
         if (contact != null) ContactsListBox.SelectedItem = contact;
     }
-
-    private void SelectContactById(string id)
-    {
-        try
-        {
-            var key = Convert.FromHexString(id);
-            if (key.Length != 32) return;
-            SelectContactByPublicKey(key);
-        }
-        catch (FormatException)
-        {
-            // Ignore malformed node IDs.
-        }
-    }
-
-    private async void SendButton_Click(object sender, RoutedEventArgs e) => await SendMessageAsync();
-    private async void MessageTextBox_KeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { e.Handled = true; await SendMessageAsync(); } }
-
-    private async Task SendMessageAsync()
-    {
-        var text = MessageTextBox.Text.Trim();
-        if (string.IsNullOrEmpty(text) || _client == null) return;
-        try
-        {
-            if (DirectMessageCheckBox.IsChecked == true)
-            {
-                if (ContactsListBox.SelectedItem is not MeshCoreContact contact) throw new InvalidOperationException("Select a contact before sending a direct message.");
-                if (contact.PublicKey.Length != 32) throw new InvalidOperationException("The selected contact has no valid 32-byte public key.");
-                await _client.SendDirectMessageAsync(contact.PublicKey, text);
-                _messageStore.Add(new MeshCoreMessage(contact.PublicKey.Take(6).ToArray(), null, text, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, true), outgoing: true, peerKeyPrefix: Convert.ToHexString(contact.PublicKey.Take(6).ToArray()));
-                _messages.Add($"[DM → {contact.Name}] {text}");
-            }
-            else
-            {
-                await _client.SendChannelMessageAsync(_activeChannel, text);
-                _messageStore.Add(new MeshCoreMessage(null, _activeChannel, text, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), null, false), outgoing: true);
-                _messages.Add($"[you / CH {_activeChannel}] {text}");
-            }
-            MessageTextBox.Clear();
-        }
-        catch (Exception ex) { StatusText.Text = $"Send failed: {ex.Message}"; }
-    }
-
-    protected override void OnClosed(EventArgs e) { DisconnectClient(); base.OnClosed(e); }
-
-    private sealed class MeshCoreNodeListItem
-    {
-        private readonly MeshCoreNode _node;
-        public MeshCoreNodeListItem(MeshCoreNode node) => _node = node;
-        public string DisplayName => _node.Name;
-        public MeshCoreContactType Type => _node.Type;
-        public string PositionText => _node.HasPosition ? $"{_node.Latitude:F5}, {_node.Longitude:F5}" : "No GPS";
-        public byte[] PublicKey => Convert.FromHexString(_node.PublicKeyHex);
-    }
-
-    private sealed class MeshCoreMapListItem
-    {
-        private readonly MeshCoreMapNode _node;
-        public MeshCoreMapListItem(MeshCoreMapNode node) => _node = node;
-        public string Id => _node.Id;
-        public string DisplayText => $"{_node.Name} · {_node.Type} · {_node.Latitude:F5}, {_node.Longitude:F5}";
-    }
-}
