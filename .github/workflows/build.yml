@@ -53,28 +53,32 @@ jobs:
           path: publish_output/MeshCoreWindowsClient.exe
           if-no-files-found: error
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/feature/meshcore-client'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
-          name: MeshCore Windows Client ${{ github.ref_name }}
+          tag_name: v0.1.0-alpha.1
+          name: MeshCore Windows Client v0.1.0-alpha.1
           body: |
-            ## MeshCore Windows Client ${{ github.ref_name }}
+            ## MeshCore Windows Client v0.1.0-alpha.1
 
-            Native Windows client for MeshCore Companion radios.
+            First public test build of the native MeshCore Windows client.
 
-            ### Transports
-            - MeshCore Companion over USB/Serial
-            - MeshCore Companion over BLE
-            - MeshCore Companion over TCP streams
+            ### Platform
+            - Windows 10/11 x64
+            - Self-contained .NET 8 build
+            - No .NET installation required
 
             ### Current features
-            - Companion startup synchronization
+            - MeshCore Companion startup synchronization
             - Device and self information
             - Contact synchronization
             - Channel synchronization
             - Channel messaging
             - Direct-message command support
             - KISS codec foundation
+            - MeshCore node map foundation
+
+            ⚠️ Early alpha test build. Please report startup/runtime problems and UI issues.
           files: publish_output/MeshCoreWindowsClient.exe
           draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          prerelease: true
