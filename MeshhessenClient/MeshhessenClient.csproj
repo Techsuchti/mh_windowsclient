@@ -1,5 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
@@ -8,84 +7,41 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-
-    <!-- Standalone EXE Configuration -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishTrimmed>false</PublishTrimmed>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishDir>..\public\</PublishDir>
-
-    <AssemblyName>MeshhessenClient</AssemblyName>
-    <Version>1.6.2.3</Version>
-    <AssemblyVersion>1.6.2.3</AssemblyVersion>
-    <FileVersion>1.6.2.3</FileVersion>
-    <Company>Meshtastic Community</Company>
-    <Product>Meshhessen Client</Product>
-    <Description>Offline-fähiger Windows Client für Meshtastic Geräte</Description>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <AssemblyName>MeshCoreWindowsClient</AssemblyName>
+    <Version>2.0.0.0</Version>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Company>MeshCore Community</Company>
+    <Product>MeshCore Windows Client</Product>
+    <Description>Windows Desktop Client für MeshCore Companion Radios</Description>
   </PropertyGroup>
 
+  <!-- Legacy Meshtastic source remains in git history but is deliberately excluded. -->
   <ItemGroup>
-    <!-- Serial Port Communication -->
-    <PackageReference Include="Mapsui.Nts" Version="4.1.7" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
-    <PackageReference Include="OxyPlot.Wpf" Version="2.2.0" />
+    <Compile Remove="**\*.cs" />
+    <Compile Include="App.xaml.cs" />
+    <Compile Include="MeshCoreMainWindow.xaml.cs" />
+    <Compile Include="Controls\MeshCoreMapCanvas.xaml.cs" />
+    <Compile Include="Services\IConnectionService.cs" />
+    <Compile Include="Services\SerialConnectionService.cs" />
+    <Compile Include="Services\Logger.cs" />
+    <Compile Include="Services\MeshCore*.cs" />
+    <Compile Include="Protocols\MeshCore\**\*.cs" />
+
+    <Page Remove="**\*.xaml" />
+    <ApplicationDefinition Remove="**\*.xaml" />
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="MeshCoreMainWindow.xaml" />
+    <Page Include="Controls\MeshCoreMapCanvas.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
-
-    <!-- Protobuf for Meshtastic Protocol -->
-    <PackageReference Include="Google.Protobuf" Version="3.25.2" />
-    <PackageReference Include="Grpc.Tools" Version="2.60.0" PrivateAssets="All" />
-
-    <!-- MVVM Helper -->
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-
-    <!-- Modern UI -->
-    <PackageReference Include="ModernWpfUI" Version="0.9.6" />
-
-    <!-- Crypto: X25519 ECDH + AES-CTR for PKI packet decryption -->
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
-
-    <!-- MQTT Proxy-to-Client -->
-    <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
-
-    <!-- Offline Map -->
-    <PackageReference Include="Mapsui" Version="4.1.7" />
-    <PackageReference Include="Mapsui.Wpf" Version="4.1.7" />
-
-    <!-- Color Emoji rendering (WPF does not natively support COLR color fonts) -->
-    <PackageReference Include="Emoji.Wpf" Version="0.3.3" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!-- Official Meshtastic protobufs via the ../protobufs git submodule (pinned commit).
-         Update: cd protobufs && git checkout <tag> && cd .. && git add protobufs.
-         ProtoRoot=../protobufs so imports "meshtastic/x.proto" and "nanopb.proto" resolve. -->
-    <Protobuf Include="..\protobufs\meshtastic\**\*.proto;..\protobufs\nanopb.proto"
-              GrpcServices="None" ProtoRoot="..\protobufs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Remove="logo_mh_wide.jpg" />
-    <None Remove="Resources\app.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="logo_mh_wide.jpg" />
-    <Resource Include="Resources\app.ico" />
-    <Resource Include="Resources\Strings.de.xaml" />
-    <Resource Include="Resources\Strings.en.xaml" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="..\CHANNELS.csv" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Vector map assets (MapLibre GL JS + map page), extracted at runtime for the WebView2 map -->
-    <EmbeddedResource Include="Resources\VectorMap\**" />
-  </ItemGroup>
-
 </Project>

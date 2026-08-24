@@ -1,0 +1,12 @@
+<UserControl x:Class="MeshhessenClient.Views.MeshCoreMapView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="#10151B">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="MeshCore Network Map" FontSize="18" FontWeight="SemiBold" Margin="10" Foreground="White"/>
+        <Canvas Grid.Row="1" x:Name="MapCanvas" Background="#182029" SizeChanged="OnMapSizeChanged"/>
+    </Grid>
+</UserControl>
