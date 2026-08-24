@@ -9,7 +9,7 @@ public sealed class MeshCoreSupervisedApplicationController : IAsyncDisposable
     private readonly MeshCoreConnectionSupervisor _supervisor;
 
     public MeshCoreApplicationController Controller => _controller;
-    public bool IsConnected => _supervisor.IsRunning && _controller.NodeRegistry.Nodes.Count >= 0;
+    public bool IsConnected => _supervisor.IsConnected;
 
     public event EventHandler<bool>? ConnectionStateChanged;
 
